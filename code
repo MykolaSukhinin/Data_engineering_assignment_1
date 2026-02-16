@@ -1,0 +1,48 @@
+create or  replace table trump_tweets_clean as
+WITH raw_data AS (
+    select * from read_json_auto('donald_data.json')
+)
+select
+    id,
+    strptime(created_at, '%a %b %d %H:%M:%S %z %Y')::TIMESTAMP as created_at,
+    full_text, retweet_count, favorite_count,
+    json_extract_string(user, '$.screen_name') as handle,
+    CAST(json_extract(user, '$.followers_count') AS INT) as followers
+from raw_data;
+
+
+create or  replace table tweet_hashtags as
+with raw_data as (
+    select id, entities from read_json_auto('donald_data.json'))
+select
+    id as tweet_id,
+    unnest(CAST(json_extract(entities, '$.hashtags') as JSON[])).text as hashtag
+from raw_data;
+
+select * from trump_tweets_clean;
+-- but there are not a whole number of months
+-- top 10 hashtags
+
+select hashtag,
+    count(*) as count
+from tweets
+where hashtag IS NOT NULL
+group by hashtag
+order by count(*) desc
+limit 10;
+
+-- count of tweets by month in 2018
+select
+    date_part('month', created_at) AS tweet_month,
+    count(*) AS total_tweets
+from tweets
+where date_part('year', created_at) = 2018
+group by tweet_month
+order by tweet_month;
+
+
+--checking
+select
+    count(*) as total_rows, count(DISTINCT id) as uniq_id,
+    count(*) FILTER (WHERE full_text IS NULL) as missing_text
+from tweets;
